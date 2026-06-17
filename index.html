@@ -43,6 +43,11 @@
   #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
   .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
   .pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
+  .help{cursor:help;color:var(--mut);font-size:10px;font-weight:700;margin-left:3px;position:relative}
+  .help:hover::after{content:attr(data-tip);position:absolute;bottom:120%;left:-80px;width:180px;background:var(--line);
+                     border:1px solid var(--mut);border-radius:6px;padding:8px;font-size:11px;font-weight:400;
+                     color:var(--txt);z-index:999;white-space:normal;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .help:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -51,10 +56,11 @@
   <div class="sub" id="sub">memuat…</div>
 
   <div class="cards">
-    <div class="card"><div class="lbl">Spot</div><div class="val" id="c-spot" style="color:var(--spot)">—</div></div>
-    <div class="card"><div class="lbl">Realized Price</div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
-    <div class="card"><div class="lbl">Floor Produksi</div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
-    <div class="card"><div class="lbl">MVRV</div><div class="val" id="c-mvrv">—</div></div>
+    <div class="card"><div class="lbl">Spot <span class="help" data-tip="Harga pasar BTC saat ini">?</span></div><div class="val" id="c-spot" style="color:var(--spot)">—</div></div>
+    <div class="card"><div class="lbl">Realized Price <span class="help" data-tip="Cost basis rata-rata jaringan — harga beli rata-rata semua BTC">?</span></div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
+    <div class="card"><div class="lbl">Floor Produksi <span class="help" data-tip="Perkiraan biaya listrik buat tambang 1 BTC — lantai hard downside">?</span></div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
+    <div class="card"><div class="lbl">MVRV <span class="help" data-tip="Market Cap / Realized Cap — rasio valuasi (>1 premium, <1 diskon)">?</span></div><div class="val" id="c-mvrv">—</div></div>
+    <div class="card"><div class="lbl">Avg Premium <span class="help" data-tip="Rata-rata premium dari semua (all-time), 2 tahun, 1 tahun, 90 hari terakhir">?</span></div><div class="val" id="c-avgprem" style="font-size:14px">—</div></div>
     <div class="card verdict" style="flex:1;min-width:240px;display:flex;flex-direction:column;justify-content:center">
       <div class="lbl" style="color:var(--mut);font-size:11px">SINYAL AKUMULASI</div>
       <div id="verdict" style="margin-top:4px">—</div>
@@ -70,9 +76,9 @@
   </div>
 
   <div class="legend">
-    <span><i class="dot" style="background:var(--spot)"></i>Harga Spot</span>
-    <span><i class="dot" style="background:var(--realized)"></i>Realized Price (cost basis jaringan)</span>
-    <span><i class="dot" style="background:var(--floor)"></i>Floor Produksi (biaya tambang — lantai hard)</span>
+    <span><i class="dot" style="background:var(--spot)"></i>Harga Spot <span class="help" data-tip="Harga pasar BTC realtime">?</span></span>
+    <span><i class="dot" style="background:var(--realized)"></i>Realized Price <span class="help" data-tip="Cost basis jaringan — harga beli rata-rata semua BTC di blockchain">?</span></span>
+    <span><i class="dot" style="background:var(--floor)"></i>Floor Produksi <span class="help" data-tip="Biaya listrik rata-rata tambang — lantai hard, bukan target harga">?</span></span>
   </div>
   <div id="hud">arahkan kursor ke grafik untuk melihat nilai per tanggal…</div>
   <div id="chart"></div>
@@ -160,7 +166,7 @@ function updateHUD(r){
     `<span class="h-item"><i class="h-dot" style="background:var(--realized)"></i>Realized <b>${fmt(r.realized)}</b> · ${mosField(r)}</span>`+
     `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>Floor Produksi ${floorTxt}</span>`+
     `<span class="h-item"><i class="h-dot" style="background:#b18cff"></i>MVRV <b>${r.mvrv.toFixed(2)}</b> <span style="color:${zc};font-weight:700">${z}</span> <span class="h-sub">· ${act}</span></span>`+
-    (r.addr?`<span class="h-item">Alamat aktif <b>${Math.round(r.addr).toLocaleString('en-US')}</b></span>`:'');
+    (r.addr?`<span class="h-item">Active Addresses <b>${Math.round(r.addr).toLocaleString('en-US')}</b></span>`:'');
 }
 function hudFromParam(p){
   if(p && p.time){ updateHUD(byDate[p.time]); }
@@ -203,6 +209,20 @@ document.getElementById('c-mvrv').textContent  = L.mvrv.toFixed(2);
 document.getElementById('sub').textContent =
   `${D.meta.n} hari · ${D.meta.range[0]} → ${D.meta.range[1]} · sumber: ${D.meta.source} · update ${D.meta.generated}`;
 
+// ---- hitung average premium (semua periode) ----
+function avgPremium(days) {
+  const cutoff = days===0 ? S[0].t : S[S.length-1-Math.min(S.length-1,days)].t;
+  const filtered = S.filter(r => r.t >= cutoff);
+  const prems = filtered.map(r => (r.price/r.realized-1)*100);
+  return prems.length > 0 ? prems.reduce((a,b)=>a+b)/prems.length : 0;
+}
+const avgAll = avgPremium(0);      // semua
+const avg2Y = avgPremium(730);     // 2 tahun
+const avg1Y = avgPremium(365);     // 1 tahun
+const avg90D = avgPremium(90);     // 90 hari
+const avgTxt = `All: ${avgAll.toFixed(1)}% · 2Y: ${avg2Y.toFixed(1)}% · 1Y: ${avg1Y.toFixed(1)}% · 90D: ${avg90D.toFixed(1)}%`;
+document.getElementById('c-avgprem').textContent = avgTxt;
+
 const m=L.mvrv;
 const [zona,warna,act]=zoneMVRV(m);
 const mosNow=(L.realized-L.price)/L.realized*100;
@@ -223,11 +243,12 @@ document.getElementById('verdict').innerHTML =
 const downside = ((L.floor/L.price-1)*100).toFixed(0);
 document.getElementById('foot').innerHTML =
   `⚠️ <b>Alert, bukan enforcer</b> — angka deterministik, keputusan tetap di tangan kamu.<br>
-   <b>Realized Price</b> = cost basis rata-rata jaringan (diturunkan dari MVRV gratis). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
-   positif = diskon di bawah cost basis; negatif = premium. <b>Floor Produksi</b> = perkiraan biaya tambang
-   (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai hard, bukan target harga.<br>
-   Jarak spot ke Floor Produksi: <b>${downside}%</b> (perkiraan ruang downside bila penambang kapitulasi).
-   S2F & Rainbow Chart sengaja tidak dipakai (tak punya dasar fundamental). Refresh data: jalankan <code>python fetch_data.py</code>.`;
+   <b>Konsep:</b> <b>Realized Price</b> = harga beli rata-rata semua BTC (cost basis jaringan). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
+   positif (+) = harga DI BAWAH cost basis (diskon, Graham zone); negatif (−) = harga DI ATAS cost basis (premium).
+   <b>Avg Premium</b> = rata-rata premium per periode (historis vs sekarang). <b>Floor Produksi</b> = biaya tambang rata-rata (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai hard, bukan target harga.<br>
+   <b>Zona valuasi (MVRV):</b> <1 Deep Value | 1–1.5 Akumulasi | 1.5–2.4 Wajar/Hold | 2.4–3.2 Mahal | >3.2 Euforia.
+   Jarak sekarang ke Floor Produksi: <b>${downside}%</b> downside. S2F & Rainbow Chart sengaja dihindari (tak punya dasar fundamental).<br>
+   <b>Update:</b> Data otomatis harian 08:15 WITA via GitHub Actions. Manual: jalankan <code>python fetch_data.py</code>.`;
 
 function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 </script>
