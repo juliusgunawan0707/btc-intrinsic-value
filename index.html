@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BTC — Harga vs Nilai Intrinsik</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{
+    --bg:#0b0f19; --panel:#121829; --line:#1f2940; --txt:#e6ebf5; --mut:#8a95ad;
+    --spot:#f7931a; --realized:#4da3ff; --floor:#3ddc97; --accent:#f7931a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font-family:'Segoe UI',system-ui,sans-serif;padding:18px}
+  h1{font-size:19px;margin:0 0 2px}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:10px 14px;min-width:130px}
+  .card .lbl{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .card .val{font-size:20px;font-weight:700;margin-top:3px}
+  .verdict{padding:10px 14px;border-radius:10px;font-weight:600;font-size:14px;
+           border:1px solid var(--line);background:var(--panel)}
+  .toolbar{display:flex;gap:6px;align-items:center;margin:12px 0;flex-wrap:wrap}
+  .tf{background:var(--panel);color:var(--mut);border:1px solid var(--line);
+      padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+  .tf.active{background:var(--accent);color:#0b0f19;border-color:var(--accent);font-weight:700}
+  .legend{display:flex;gap:16px;margin:8px 0 4px;font-size:12px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:3px;border-radius:2px;display:inline-block}
+  #chart{height:430px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
+  .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
+  .pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>₿ Bitcoin — Harga vs Nilai Intrinsik</h1>
+  <div class="sub" id="sub">memuat…</div>
+
+  <div class="cards">
+    <div class="card"><div class="lbl">Spot</div><div class="val" id="c-spot" style="color:var(--spot)">—</div></div>
+    <div class="card"><div class="lbl">Realized Price</div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
+    <div class="card"><div class="lbl">Mining Floor</div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
+    <div class="card"><div class="lbl">MVRV</div><div class="val" id="c-mvrv">—</div></div>
+    <div class="card verdict" style="flex:1;min-width:240px;display:flex;flex-direction:column;justify-content:center">
+      <div class="lbl" style="color:var(--mut);font-size:11px">SINYAL AKUMULASI</div>
+      <div id="verdict" style="margin-top:4px">—</div>
+    </div>
+  </div>
+
+  <div class="toolbar" id="tfbar">
+    <span style="color:var(--mut);font-size:12px;margin-right:4px">Rentang:</span>
+    <button class="tf" data-d="90">3B</button>
+    <button class="tf" data-d="365">1T</button>
+    <button class="tf" data-d="730">2T</button>
+    <button class="tf active" data-d="0">ALL</button>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--spot)"></i>Harga Spot</span>
+    <span><i class="dot" style="background:var(--realized)"></i>Realized Price (cost basis jaringan)</span>
+    <span><i class="dot" style="background:var(--floor)"></i>Mining Floor (kapitulasi)</span>
+  </div>
+  <div id="chart"></div>
+  <div class="legend" style="margin-top:10px"><span><i class="dot" style="background:#b18cff"></i>MVRV — zona valuasi</span></div>
+  <div id="mvrv"></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.BTC_DATA;
+const S = D.series;
+const fmt = n => n==null ? '—' : '$'+Math.round(n).toLocaleString('en-US');
+
+// ---- charts ----
+const common = {
+  layout:{background:{color:'transparent'},textColor:'#8a95ad'},
+  grid:{vertLines:{color:'#1f2940'},horzLines:{color:'#1f2940'}},
+  rightPriceScale:{borderColor:'#1f2940'},
+  timeScale:{borderColor:'#1f2940'},
+  crosshair:{mode:0},
+};
+const chart = LightweightCharts.createChart(document.getElementById('chart'),
+  {...common, height:430, localization:{priceFormatter:fmt}});
+chart.priceScale('right').applyOptions({mode:1}); // log scale
+
+const spot = chart.addLineSeries({color:getCSS('--spot'),lineWidth:2,title:'Spot'});
+const real = chart.addLineSeries({color:getCSS('--realized'),lineWidth:2,title:'Realized'});
+const floor= chart.addLineSeries({color:getCSS('--floor'),lineWidth:2,title:'Floor'});
+
+// haluskan mining floor (MA 30 hari) — floor adalah tren biaya, bukan noise harian
+function sma(arr,key,win){
+  const out=[]; let sum=0, q=[];
+  for(const r of arr){
+    const v=r[key]; if(v==null){continue;}
+    q.push(v); sum+=v; if(q.length>win)sum-=q.shift();
+    out.push({time:r.t,value:sum/q.length});
+  }
+  return out;
+}
+spot.setData(S.map(r=>({time:r.t,value:r.price})));
+real.setData(S.map(r=>({time:r.t,value:r.realized})));
+floor.setData(sma(S,'floor',30));
+
+const mchart = LightweightCharts.createChart(document.getElementById('mvrv'),{...common,height:130});
+const mvrv = mchart.addLineSeries({color:'#b18cff',lineWidth:2});
+mvrv.setData(S.map(r=>({time:r.t,value:r.mvrv})));
+// garis zona MVRV
+[[1,'#3ddc97','wajar'],[2.4,'#f7c948','premium'],[3.7,'#ff5c5c','euforia']].forEach(([v,c])=>{
+  mvrv.createPriceLine({price:v,color:c,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:String(v)});
+});
+
+// sinkron sumbu waktu (dengan guard agar tidak saling memanggil tanpa henti)
+let syncing=false;
+chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+  if(syncing||!r)return; syncing=true;
+  mchart.timeScale().setVisibleLogicalRange(r); syncing=false;
+});
+mchart.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+  if(syncing||!r)return; syncing=true;
+  chart.timeScale().setVisibleLogicalRange(r); syncing=false;
+});
+
+// ---- rentang waktu ----
+function setRange(days){
+  if(days===0){ chart.timeScale().fitContent(); return; }
+  const to = S[S.length-1].t;
+  const from = S[Math.max(0,S.length-1-days)].t;
+  chart.timeScale().setVisibleRange({from,to});
+}
+document.querySelectorAll('.tf').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tf').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); setRange(+b.dataset.d);
+});
+chart.timeScale().fitContent();
+
+// ---- kartu + verdict ----
+const L = D.meta.latest;
+document.getElementById('c-spot').textContent  = fmt(L.price);
+document.getElementById('c-real').textContent  = fmt(L.realized);
+document.getElementById('c-floor').textContent = fmt(L.floor);
+document.getElementById('c-mvrv').textContent  = L.mvrv.toFixed(2);
+document.getElementById('sub').textContent =
+  `${D.meta.n} hari · ${D.meta.range[0]} → ${D.meta.range[1]} · sumber: ${D.meta.source} · update ${D.meta.generated}`;
+
+const m=L.mvrv;
+let zona,warna,saran;
+if(m<1){zona='MURAH / KAPITULASI';warna='#3ddc97';saran='Harga di bawah cost basis — historisnya zona akumulasi terbaik.';}
+else if(m<2.4){zona='WAJAR';warna='#4da3ff';saran='Belum mahal. Zona akumulasi sehat. Makin menarik bila MVRV mendekati 1.';}
+else if(m<3.7){zona='PREMIUM';warna='#f7c948';saran='Mulai mahal — disiplin, kurangi agresivitas beli.';}
+else{zona='EUFORIA';warna='#ff5c5c';saran='Overvalued historis — hindari beli besar.';}
+document.getElementById('verdict').innerHTML =
+  `<span class="pill" style="background:${warna};color:#0b0f19">${zona}</span>
+   <span style="color:var(--mut);font-size:12px;display:block;margin-top:6px">${saran}</span>`;
+
+const downside = ((L.floor/L.price-1)*100).toFixed(0);
+document.getElementById('foot').innerHTML =
+  `⚠️ <b>Alert, bukan enforcer</b> — angka deterministik, keputusan tetap di tangan kamu.<br>
+   Realized Price diturunkan dari MVRV gratis (CapRealUSD kini berbayar). Mining Floor = perkiraan biaya listrik produksi
+   (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai kapitulasi, bukan target harga.<br>
+   Jarak spot ke mining floor: <b>${downside}%</b> (perkiraan ruang downside bila terjadi kapitulasi penambang).
+   S2F & Rainbow Chart sengaja tidak dipakai (tak punya dasar fundamental). Refresh data: jalankan <code>python fetch_data.py</code>.`;
+
+function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+</script>
+</body>
+</html>
