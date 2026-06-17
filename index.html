@@ -43,11 +43,14 @@
   #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
   .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
   .pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
-  .help{cursor:help;color:var(--mut);font-size:10px;font-weight:700;margin-left:3px;position:relative}
-  .help:hover::after{content:attr(data-tip);position:absolute;bottom:120%;left:-80px;width:180px;background:var(--line);
-                     border:1px solid var(--mut);border-radius:6px;padding:8px;font-size:11px;font-weight:400;
-                     color:var(--txt);z-index:999;white-space:normal;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-  .help:hover{color:var(--accent)}
+  .help{cursor:help;color:var(--mut);font-size:9px;font-weight:700;margin-left:2px;position:relative;
+         display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;
+         border-radius:50%;background:rgba(138,149,173,.2);vertical-align:middle}
+  .help:hover{color:var(--accent);background:rgba(247,147,26,.2)}
+  .help:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+                     width:160px;background:var(--line);border:1px solid var(--accent);border-radius:6px;padding:8px;
+                     font-size:11px;font-weight:400;color:var(--txt);z-index:999;white-space:normal;
+                     box-shadow:0 4px 12px rgba(0,0,0,.4)}
 </style>
 </head>
 <body>
