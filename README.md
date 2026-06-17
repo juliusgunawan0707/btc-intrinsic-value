@@ -8,7 +8,7 @@ Dashboard yang melacak **harga spot BTC** terhadap dua proxy nilai fundamental d
 
 Rentang waktu bisa di-zoom (3 bulan / 1 tahun / 2 tahun / semua), gaya TradingView.
 
-**[🔗 Buka dashboard](https://juliusgunawan0707.github.io/REPO-NAME/)**
+**[🔗 Buka dashboard](https://juliusgunawan0707.github.io/btc-intrinsic-value/)**
 
 ## Data — 100% gratis, deterministik
 
