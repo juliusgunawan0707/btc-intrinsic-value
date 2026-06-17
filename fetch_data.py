@@ -89,8 +89,9 @@ def main():
     rows = fetch()
     series = build(rows)
     last = series[-1]
+    wita = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
     meta = {
-        "generated": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "generated": wita.strftime("%Y-%m-%d %H:%M WITA"),
         "params": {"eff_j_per_th": EFFICIENCY_J_PER_TH,
                    "price_per_kwh": PRICE_PER_KWH,
                    "elec_share": ELEC_SHARE},
