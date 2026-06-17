@@ -37,7 +37,8 @@
   #hud .h-item{display:inline-flex;align-items:center;gap:5px;color:var(--mut)}
   #hud .h-item b{color:var(--txt);font-weight:700}
   #hud .h-dot{width:8px;height:8px;border-radius:50%}
-  #hud .up{color:#3ddc97} #hud .down{color:#ff5c5c}
+  #hud .up{color:#3ddc97;font-weight:700} #hud .down{color:#ff5c5c}
+  #hud .h-sub{color:var(--mut);font-size:11px}
   #chart{height:430px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
   .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
@@ -52,7 +53,7 @@
   <div class="cards">
     <div class="card"><div class="lbl">Spot</div><div class="val" id="c-spot" style="color:var(--spot)">—</div></div>
     <div class="card"><div class="lbl">Realized Price</div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
-    <div class="card"><div class="lbl">Mining Floor</div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
+    <div class="card"><div class="lbl">Floor Produksi</div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
     <div class="card"><div class="lbl">MVRV</div><div class="val" id="c-mvrv">—</div></div>
     <div class="card verdict" style="flex:1;min-width:240px;display:flex;flex-direction:column;justify-content:center">
       <div class="lbl" style="color:var(--mut);font-size:11px">SINYAL AKUMULASI</div>
@@ -71,7 +72,7 @@
   <div class="legend">
     <span><i class="dot" style="background:var(--spot)"></i>Harga Spot</span>
     <span><i class="dot" style="background:var(--realized)"></i>Realized Price (cost basis jaringan)</span>
-    <span><i class="dot" style="background:var(--floor)"></i>Mining Floor (kapitulasi)</span>
+    <span><i class="dot" style="background:var(--floor)"></i>Floor Produksi (biaya tambang — lantai hard)</span>
   </div>
   <div id="hud">arahkan kursor ke grafik untuk melihat nilai per tanggal…</div>
   <div id="chart"></div>
@@ -128,27 +129,37 @@ mvrv.setData(S.map(r=>({time:r.t,value:r.mvrv})));
 // ---- HUD legend per tanggal (ala TradingView) ----
 const byDate = {}; S.forEach(r=>byDate[r.t]=r);
 const hud = document.getElementById('hud');
+// zona valuasi 5-tingkat (berbasis MVRV = Spot/Realized) + aksi
 function zoneMVRV(m){
-  if(m<1) return ['MURAH','#3ddc97'];
-  if(m<2.4) return ['WAJAR','#4da3ff'];
-  if(m<3.7) return ['PREMIUM','#f7c948'];
-  return ['EUFORIA','#ff5c5c'];
+  if(m<1.0) return ['DEEP VALUE','#3ddc97','akumulasi agresif'];
+  if(m<1.5) return ['AKUMULASI','#3ddc97','beli bertahap OK'];
+  if(m<2.4) return ['WAJAR / HOLD','#4da3ff','tahan, beli selektif'];
+  if(m<3.2) return ['MAHAL','#f7c948','kurangi agresivitas'];
+  return ['EUFORIA','#ff5c5c','distribusi / hindari'];
 }
 function pct(a,b){ // a vs b, +/-
   const v=(a/b-1)*100, s=v>=0?'+':'';
   const cls=v>=0?'up':'down';
   return `<span class="${cls}">${s}${v.toFixed(1)}%</span>`;
 }
+// satu field adaptif: MoS positif (diskon) atau Premium (di atas cost basis)
+function mosField(r){
+  const mos=(r.realized-r.price)/r.realized*100;
+  if(mos>=0)
+    return `<span class="up">Margin of Safety +${mos.toFixed(1)}%</span>`;
+  return `<span style="color:#f7c948;font-weight:700">Premium +${(-mos).toFixed(1)}%</span>`
+       + ` <span class="h-sub">(MoS −${(-mos).toFixed(1)}%)</span>`;
+}
 function updateHUD(r){
   if(!r){ hud.innerHTML='arahkan kursor ke grafik untuk melihat nilai per tanggal…'; return; }
-  const [z,zc]=zoneMVRV(r.mvrv);
+  const [z,zc,act]=zoneMVRV(r.mvrv);
   const floorTxt = r.floor ? `<b>${fmt(r.floor)}</b> <span class="down">${pct(r.floor,r.price)}</span>` : '<b>—</b>';
   hud.innerHTML =
     `<span class="h-date">${r.t}</span>`+
     `<span class="h-item"><i class="h-dot" style="background:var(--spot)"></i>Spot <b>${fmt(r.price)}</b></span>`+
-    `<span class="h-item"><i class="h-dot" style="background:var(--realized)"></i>Realized <b>${fmt(r.realized)}</b> · premium ${pct(r.price,r.realized)}</span>`+
-    `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>Floor ${floorTxt}</span>`+
-    `<span class="h-item"><i class="h-dot" style="background:#b18cff"></i>MVRV <b>${r.mvrv.toFixed(2)}</b> <span style="color:${zc};font-weight:700">${z}</span></span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--realized)"></i>Realized <b>${fmt(r.realized)}</b> · ${mosField(r)}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>Floor Produksi ${floorTxt}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:#b18cff"></i>MVRV <b>${r.mvrv.toFixed(2)}</b> <span style="color:${zc};font-weight:700">${z}</span> <span class="h-sub">· ${act}</span></span>`+
     (r.addr?`<span class="h-item">Alamat aktif <b>${Math.round(r.addr).toLocaleString('en-US')}</b></span>`:'');
 }
 function hudFromParam(p){
@@ -193,11 +204,18 @@ document.getElementById('sub').textContent =
   `${D.meta.n} hari · ${D.meta.range[0]} → ${D.meta.range[1]} · sumber: ${D.meta.source} · update ${D.meta.generated}`;
 
 const m=L.mvrv;
-let zona,warna,saran;
-if(m<1){zona='MURAH / KAPITULASI';warna='#3ddc97';saran='Harga di bawah cost basis — historisnya zona akumulasi terbaik.';}
-else if(m<2.4){zona='WAJAR';warna='#4da3ff';saran='Belum mahal. Zona akumulasi sehat. Makin menarik bila MVRV mendekati 1.';}
-else if(m<3.7){zona='PREMIUM';warna='#f7c948';saran='Mulai mahal — disiplin, kurangi agresivitas beli.';}
-else{zona='EUFORIA';warna='#ff5c5c';saran='Overvalued historis — hindari beli besar.';}
+const [zona,warna,act]=zoneMVRV(m);
+const mosNow=(L.realized-L.price)/L.realized*100;
+const mosTxt = mosNow>=0
+  ? `Margin of Safety <b style="color:#3ddc97">+${mosNow.toFixed(1)}%</b> (di bawah cost basis)`
+  : `Premium <b style="color:#f7c948">+${(-mosNow).toFixed(1)}%</b> di atas cost basis — belum ada margin of safety`;
+// jarak ke zona MAHAL (MVRV 2.4) dan ke DEEP VALUE (MVRV 1.0)
+const priceExpensive = 2.4*L.realized;            // ambang MAHAL
+const priceDeepValue = 1.0*L.realized;            // ambang DEEP VALUE
+const roomUp  = ((priceExpensive/L.price-1)*100).toFixed(0);
+const saran = `${mosTxt}. Aksi: <b>${act}</b>. `+
+  `Zona "MAHAL" mulai ~${fmt(priceExpensive)} (+${roomUp}% dari sekarang); `+
+  `MoS sejati muncul di bawah ${fmt(priceDeepValue)} (MVRV<1).`;
 document.getElementById('verdict').innerHTML =
   `<span class="pill" style="background:${warna};color:#0b0f19">${zona}</span>
    <span style="color:var(--mut);font-size:12px;display:block;margin-top:6px">${saran}</span>`;
@@ -205,9 +223,10 @@ document.getElementById('verdict').innerHTML =
 const downside = ((L.floor/L.price-1)*100).toFixed(0);
 document.getElementById('foot').innerHTML =
   `⚠️ <b>Alert, bukan enforcer</b> — angka deterministik, keputusan tetap di tangan kamu.<br>
-   Realized Price diturunkan dari MVRV gratis (CapRealUSD kini berbayar). Mining Floor = perkiraan biaya listrik produksi
-   (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai kapitulasi, bukan target harga.<br>
-   Jarak spot ke mining floor: <b>${downside}%</b> (perkiraan ruang downside bila terjadi kapitulasi penambang).
+   <b>Realized Price</b> = cost basis rata-rata jaringan (diturunkan dari MVRV gratis). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
+   positif = diskon di bawah cost basis; negatif = premium. <b>Floor Produksi</b> = perkiraan biaya tambang
+   (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai hard, bukan target harga.<br>
+   Jarak spot ke Floor Produksi: <b>${downside}%</b> (perkiraan ruang downside bila penambang kapitulasi).
    S2F & Rainbow Chart sengaja tidak dipakai (tak punya dasar fundamental). Refresh data: jalankan <code>python fetch_data.py</code>.`;
 
 function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
