@@ -30,6 +30,14 @@
   .legend{display:flex;gap:16px;margin:8px 0 4px;font-size:12px;flex-wrap:wrap}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .dot{width:11px;height:3px;border-radius:2px;display:inline-block}
+  #hud{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel);
+       border:1px solid var(--line);border-radius:9px;padding:9px 13px;margin-bottom:8px;
+       font-size:13px;font-variant-numeric:tabular-nums;min-height:40px}
+  #hud .h-date{font-weight:700;color:var(--txt);margin-right:2px}
+  #hud .h-item{display:inline-flex;align-items:center;gap:5px;color:var(--mut)}
+  #hud .h-item b{color:var(--txt);font-weight:700}
+  #hud .h-dot{width:8px;height:8px;border-radius:50%}
+  #hud .up{color:#3ddc97} #hud .down{color:#ff5c5c}
   #chart{height:430px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
   .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
@@ -65,6 +73,7 @@
     <span><i class="dot" style="background:var(--realized)"></i>Realized Price (cost basis jaringan)</span>
     <span><i class="dot" style="background:var(--floor)"></i>Mining Floor (kapitulasi)</span>
   </div>
+  <div id="hud">arahkan kursor ke grafik untuk melihat nilai per tanggal…</div>
   <div id="chart"></div>
   <div class="legend" style="margin-top:10px"><span><i class="dot" style="background:#b18cff"></i>MVRV — zona valuasi</span></div>
   <div id="mvrv"></div>
@@ -115,6 +124,40 @@ mvrv.setData(S.map(r=>({time:r.t,value:r.mvrv})));
 [[1,'#3ddc97','wajar'],[2.4,'#f7c948','premium'],[3.7,'#ff5c5c','euforia']].forEach(([v,c])=>{
   mvrv.createPriceLine({price:v,color:c,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:String(v)});
 });
+
+// ---- HUD legend per tanggal (ala TradingView) ----
+const byDate = {}; S.forEach(r=>byDate[r.t]=r);
+const hud = document.getElementById('hud');
+function zoneMVRV(m){
+  if(m<1) return ['MURAH','#3ddc97'];
+  if(m<2.4) return ['WAJAR','#4da3ff'];
+  if(m<3.7) return ['PREMIUM','#f7c948'];
+  return ['EUFORIA','#ff5c5c'];
+}
+function pct(a,b){ // a vs b, +/-
+  const v=(a/b-1)*100, s=v>=0?'+':'';
+  const cls=v>=0?'up':'down';
+  return `<span class="${cls}">${s}${v.toFixed(1)}%</span>`;
+}
+function updateHUD(r){
+  if(!r){ hud.innerHTML='arahkan kursor ke grafik untuk melihat nilai per tanggal…'; return; }
+  const [z,zc]=zoneMVRV(r.mvrv);
+  const floorTxt = r.floor ? `<b>${fmt(r.floor)}</b> <span class="down">${pct(r.floor,r.price)}</span>` : '<b>—</b>';
+  hud.innerHTML =
+    `<span class="h-date">${r.t}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--spot)"></i>Spot <b>${fmt(r.price)}</b></span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--realized)"></i>Realized <b>${fmt(r.realized)}</b> · premium ${pct(r.price,r.realized)}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>Floor ${floorTxt}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:#b18cff"></i>MVRV <b>${r.mvrv.toFixed(2)}</b> <span style="color:${zc};font-weight:700">${z}</span></span>`+
+    (r.addr?`<span class="h-item">Alamat aktif <b>${Math.round(r.addr).toLocaleString('en-US')}</b></span>`:'');
+}
+function hudFromParam(p){
+  if(p && p.time){ updateHUD(byDate[p.time]); }
+  else { updateHUD(D.meta.latest); } // keluar grafik -> tampilkan terkini
+}
+chart.subscribeCrosshairMove(hudFromParam);
+mchart.subscribeCrosshairMove(hudFromParam);
+updateHUD(D.meta.latest); // nilai awal = terkini
 
 // sinkron sumbu waktu (dengan guard agar tidak saling memanggil tanpa henti)
 let syncing=false;
