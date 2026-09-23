@@ -1,36 +1,47 @@
-# ₿ Bitcoin — Harga vs Nilai Intrinsik
+# Satoshi Scale
 
-Dashboard yang melacak **harga spot BTC** terhadap dua proxy nilai fundamental dari 2018 hingga sekarang:
+*Price vs intrinsic value · Harga vs nilai intrinsik*
 
-- **Realized Price** — rata-rata cost basis seluruh BTC di jaringan (lantai psikologis)
-- **Mining Floor** — perkiraan biaya listrik produksi 1 BTC (lantai kapitulasi penambang)
-- Panel **MVRV** dengan zona valuasi (wajar / premium / euforia)
+A dashboard that tracks **Bitcoin's spot price** against two proxies for fundamental value, from 2018 to today:
 
-Rentang waktu bisa di-zoom (3 bulan / 1 tahun / 2 tahun / semua), gaya TradingView.
+- **Realized Price** — the network-wide average cost basis of every BTC (a psychological floor)
+- **Production Floor** — the estimated electricity cost of mining 1 BTC (the miner-capitulation floor)
+- An **MVRV** panel with five valuation zones (deep value → euphoria)
 
-**[🔗 Buka dashboard](https://juliusgunawan0707.github.io/btc-intrinsic-value/)**
+Zoomable ranges (3M / 1Y / 2Y / all), a TradingView-style crosshair readout, dark/light theme and English/Bahasa Indonesia (defaults: dark + English, choices remembered per browser).
 
-## Data — 100% gratis, deterministik
+**[🔗 Open the dashboard](https://juliusgunawan0707.github.io/btc-intrinsic-value/)**
 
-Semua angka ditarik dari **Coin Metrics community API v4** (tanpa API key) dan dihitung deterministik:
+> The repository is still named `btc-intrinsic-value` so existing links keep working; only the title changed.
 
-| Metrik | Sumber |
+## Data — free and deterministic
+
+Every figure comes from the **Coin Metrics community API v4** (no API key) and is computed deterministically:
+
+| Metric | Source |
 |---|---|
-| Harga spot, MVRV, alamat aktif, hashrate | Coin Metrics community (gratis) |
-| Realized Price | diturunkan dari MVRV (`spot / MVRV`) |
-| Mining Floor | model biaya listrik dari hashrate |
+| Spot price, MVRV, active addresses, hashrate | Coin Metrics community (free) |
+| Realized Price | derived from MVRV (`spot / MVRV`) |
+| Production Floor | electricity-cost model from hashrate |
 
-> Realized Price diturunkan dari MVRV karena metrik `CapRealUSD` kini berbayar — hasilnya tetap cocok dengan referensi publik (LookIntoBitcoin).
+> Realized Price is derived from MVRV because `CapRealUSD` is now a paid metric — the result still matches public references (LookIntoBitcoin).
 
-## Cara pakai
+A GitHub Action refreshes `data.js` every day at 08:15 WITA. Manual refresh:
 
 ```bash
-python fetch_data.py    # refresh data terbaru -> data.js
-# lalu buka index.html (atau via GitHub Pages)
+python fetch_data.py    # latest data -> data.js
 ```
 
-Parameter mining cost (efisiensi ASIC, tarif listrik) dapat diubah di bagian atas `fetch_data.py`.
+Mining-cost parameters (ASIC efficiency, electricity price) live at the top of `fetch_data.py`.
+
+## Front end
+
+- `index.html` — the whole page; no build step.
+- `assets/lightweight-charts-4.1.3.js` — TradingView Lightweight Charts (Apache-2.0), vendored so the page does not fetch a script from a CDN at runtime.
+- `favicon.svg` and the header mark — an original engraved-coin design for Satoshi Scale.
+- Fonts: Poppins for text; **JetBrains Mono for every number**, because Poppins has no tabular figures (its "1" is 58% the width of its "0", so columns would jitter).
+- Loader: the Bitcoin logo draws itself, then fades into the page. The logo is the **public-domain** Bitcoin symbol (Wikimedia Commons, [`Bitcoin.svg`](https://commons.wikimedia.org/wiki/File:Bitcoin.svg), license: Public domain). Skipped under `prefers-reduced-motion`.
 
 ## Disclaimer
 
-Alat ini **dashboard/alert, bukan nasihat investasi atau sinyal beli otomatis**. Tidak memuat data portofolio pribadi mana pun. Stock-to-Flow & Rainbow Chart sengaja tidak dipakai karena tidak punya dasar fundamental.
+This is a **dashboard / alert, not investment advice or an automatic buy signal**. It holds no personal portfolio data. Stock-to-Flow and the Rainbow Chart are deliberately left out: they have no fundamental basis.

@@ -1,39 +1,82 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BTC — Harga vs Nilai Intrinsik</title>
+<title>Satoshi Scale — Bitcoin price vs intrinsic value</title>
+<meta name="description" content="Satoshi Scale tracks Bitcoin's spot price against its realized price and mining cost floor, with MVRV valuation zones. Free data, deterministic numbers.">
+<meta property="og:title" content="Satoshi Scale">
+<meta property="og:description" content="Bitcoin price vs intrinsic value — realized price, mining floor and MVRV zones, updated daily.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://juliusgunawan0707.github.io/btc-intrinsic-value/">
+<meta name="theme-color" content="#0b0f19">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>
+  // theme + language before first paint (no flash); stored choices win, default dark + English
+  (function(){
+    var d=document.documentElement,t=null,l=null;
+    try{t=localStorage.getItem('ss-theme');l=localStorage.getItem('ss-lang');}catch(e){}
+    d.setAttribute('data-theme',t==='light'?'light':'dark');
+    d.setAttribute('lang',l==='id'?'id':'en');
+    if(!window.matchMedia||!matchMedia('(prefers-reduced-motion: reduce)').matches)d.classList.add('boot');
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="assets/lightweight-charts-4.1.3.js"></script>
 <style>
-  :root{
-    --bg:#0b0f19; --panel:#121829; --line:#1f2940; --txt:#e8edf7; --mut:#9aa6bf;
-    --spot:#f7931a; --realized:#4da3ff; --floor:#2dd4a8; --accent:#f7931a;
-    --ui:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  /* Poppins has no tabular figures (a "1" is 58% the width of a "0"), so every
+     number that lines up in a column or ticks under the cursor stays in
+     JetBrains Mono. Poppins carries all the words. */
+  :root,[data-theme="dark"]{
+    --bg:#0b0f19; --panel:#121829; --line:#1f2940; --txt:#e8edf7; --mut:#9aa6bf; --tip:#0d1322;
+    --spot:#f7931a; --spot-txt:#f7931a; --realized:#4da3ff; --floor:#2dd4a8; --mvrv:#b18cff; --accent:#f7931a;
+    --up:#3ddc97; --down:#ff5c5c; --warn:#f7c948; --axis:#8a95ad; --on-accent:#0b0f19;
+    --ui:'Poppins',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+    color-scheme:dark;
+  }
+  [data-theme="light"]{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e1e5ee; --txt:#101728; --mut:#56617a; --tip:#ffffff;
+    --spot:#f7931a; --spot-txt:#b35f00; --realized:#1d6fd6; --floor:#0b8f6c; --mvrv:#7443e8; --accent:#f7931a;
+    --up:#0a8a58; --down:#d23232; --warn:#9a6a00; --axis:#5f6b84; --on-accent:#101728;
+    color-scheme:light;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);
-       font-family:var(--ui);padding:18px;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+       font-family:var(--ui);padding:18px;-webkit-font-smoothing:antialiased;transition:background-color .25s,color .25s}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0}
-  h1{font-size:20px;font-weight:800;margin:0 0 2px;letter-spacing:-.02em}
-  .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
   .wrap{max-width:1080px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .brand .logo{width:52px;height:52px;flex:none;color:var(--accent)}
+  h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em;line-height:1.15}
+  .tag{color:var(--mut);font-size:13px;font-weight:500}
+  .sub{color:var(--mut);font-size:12px;margin:0 0 14px}
+  .ctrl{display:flex;gap:8px;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .seg button,.iconbtn{font:600 12px/1 var(--ui);color:var(--mut);background:transparent;border:0;padding:8px 11px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+  .iconbtn{border:1px solid var(--line);border-radius:8px;background:var(--panel);display:inline-grid;place-items:center;width:34px;height:32px;padding:0}
+  .iconbtn svg{width:16px;height:16px}
+  .seg button:focus-visible,.iconbtn:focus-visible,.tf:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  [data-theme="dark"] .i-sun{display:none} [data-theme="light"] .i-moon{display:none}
+
+  /* ---------- cards ---------- */
   .cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-        padding:10px 14px;min-width:124px}
-  .card.hero{border-color:rgba(247,147,26,.4);background:linear-gradient(180deg,rgba(247,147,26,.08),var(--panel))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:124px}
+  .card.hero{border-color:rgba(247,147,26,.45);background:linear-gradient(180deg,rgba(247,147,26,.09),var(--panel))}
   .card .lbl{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .card .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:20px;font-weight:700;margin-top:4px}
   .card.hero .val{font-size:28px}
   .verdict{padding:10px 14px 10px 16px;border-radius:10px;font-weight:600;font-size:14px;
            border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--panel)}
   .toolbar{display:flex;gap:6px;align-items:center;margin:12px 0;flex-wrap:wrap}
-  .tf{background:var(--panel);color:var(--mut);border:1px solid var(--line);
+  .tf{background:var(--panel);color:var(--mut);border:1px solid var(--line);font-family:var(--ui);
       padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}
-  .tf.active{background:var(--accent);color:#0b0f19;border-color:var(--accent);font-weight:700}
+  .tf.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:700}
   .legend{display:flex;gap:16px;margin:8px 0 4px;font-size:12px;flex-wrap:wrap}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .dot{width:11px;height:3px;border-radius:2px;display:inline-block}
@@ -44,61 +87,134 @@
   #hud .h-item{display:inline-flex;align-items:center;gap:5px;color:var(--mut)}
   #hud .h-item b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--txt);font-weight:700}
   #hud .h-dot{width:8px;height:8px;border-radius:50%}
-  #hud .up{color:#3ddc97;font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
-  #hud .down{color:#ff5c5c;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .up{color:var(--up);font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .down{color:var(--down);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .warn{color:var(--warn);font-weight:700}
   #hud .h-sub{color:var(--mut);font-size:11px}
   #chart{height:430px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   #mvrv{height:130px;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
   .foot{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6}
-  .pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
+  .pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700;color:#0b0f19}
   .help{cursor:help;color:var(--mut);font-size:9px;font-weight:700;margin-left:3px;position:relative;
          display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
-         border-radius:50%;background:rgba(154,166,191,.18);vertical-align:middle}
-  .help::before{content:'';position:absolute;inset:-6px}  /* perbesar area sentuh */
-  .help:hover,.help:focus{color:#0b0f19;background:var(--accent);outline:none}
+         border-radius:50%;background:rgba(154,166,191,.18);vertical-align:middle;text-transform:none;letter-spacing:0}
+  .help::before{content:'';position:absolute;inset:-6px}  /* bigger touch target */
+  .help:hover,.help:focus{color:var(--on-accent);background:var(--accent);outline:none}
   .help:hover::after,.help:focus::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 9px);
-                     left:50%;transform:translateX(-50%);width:180px;max-width:46vw;background:#0d1322;
+                     left:50%;transform:translateX(-50%);width:180px;max-width:46vw;background:var(--tip);
                      border:1px solid var(--accent);border-radius:7px;padding:9px 11px;font-family:var(--ui);
                      font-size:11.5px;font-weight:400;line-height:1.45;color:var(--txt);z-index:999;
-                     white-space:normal;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+                     white-space:normal;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   .help:hover::before,.help:focus::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;
-                     transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:#0d1322;inset:auto;
+                     transform:translateX(-50%) rotate(45deg);width:9px;height:9px;background:var(--tip);inset:auto;
                      border-right:1px solid var(--accent);border-bottom:1px solid var(--accent);z-index:1000}
+
+  /* ---------- loader: the public-domain Bitcoin logo draws itself ---------- */
+  #loader{display:none}
+  .boot #loader{display:grid;position:fixed;inset:0;z-index:2000;place-items:center;background:var(--bg);
+    /* safety net: even if the script dies, the page is revealed */
+    animation:ld-out .35s ease 4s forwards}
+  #loader.done{animation:ld-out .35s ease forwards}
+  #loader svg{width:96px;height:96px;overflow:visible}
+  #loader .ring{fill:transparent;stroke:#f7931a;stroke-width:2.2;stroke-dasharray:1;stroke-dashoffset:1;
+    animation:ld-draw .55s cubic-bezier(.6,0,.3,1) forwards,ld-fill .3s ease .5s forwards}
+  #loader .b{fill:transparent;stroke:#fff;stroke-width:.9;stroke-dasharray:1;stroke-dashoffset:1;
+    transform-box:fill-box;transform-origin:50% 50%;transform:rotate(-14deg);
+    animation:ld-draw .5s ease .75s forwards,ld-bfill .25s ease 1.15s forwards,ld-tilt .4s cubic-bezier(.3,1.4,.5,1) 1.15s forwards}
+  @keyframes ld-draw{to{stroke-dashoffset:0}}
+  @keyframes ld-fill{to{fill:#f7931a}}
+  @keyframes ld-bfill{to{fill:#fff;stroke-width:0}}
+  @keyframes ld-tilt{to{transform:rotate(0)}}
+  @keyframes ld-out{to{opacity:0;visibility:hidden}}
+
+  @media (max-width:560px){
+    body{padding:14px}
+    .brand .logo{width:44px;height:44px}
+    h1{font-size:19px}
+    .tag{font-size:12px}
+  }
 </style>
 </head>
 <body>
+<div id="loader" aria-hidden="true">
+  <!-- Bitcoin logo, public domain (Wikimedia Commons "Bitcoin.svg") -->
+  <svg viewBox="0 0 64 64">
+    <path class="ring" pathLength="1" d="m63.033,39.744c-4.274,17.143-21.637,27.576-38.782,23.301-17.138-4.274-27.571-21.638-23.295-38.78,4.272-17.145,21.635-27.579,38.775-23.305,17.144,4.274,27.576,21.64,23.302,38.784z"/>
+    <path class="b" pathLength="1" d="m46.103,27.444c0.637-4.258-2.605-6.547-7.038-8.074l1.438-5.768-3.511-0.875-1.4,5.616c-0.923-0.23-1.871-0.447-2.813-0.662l1.41-5.653-3.509-0.875-1.439,5.766c-0.764-0.174-1.514-0.346-2.242-0.527l0.004-0.018-4.842-1.209-0.934,3.75s2.605,0.597,2.55,0.634c1.422,0.355,1.679,1.296,1.636,2.042l-1.638,6.571c0.098,0.025,0.225,0.061,0.365,0.117-0.117-0.029-0.242-0.061-0.371-0.092l-2.296,9.205c-0.174,0.432-0.615,1.08-1.609,0.834,0.035,0.051-2.552-0.637-2.552-0.637l-1.743,4.019,4.569,1.139c0.85,0.213,1.683,0.436,2.503,0.646l-1.453,5.834,3.507,0.875,1.439-5.772c0.958,0.26,1.888,0.5,2.798,0.726l-1.434,5.745,3.511,0.875,1.453-5.823c5.987,1.133,10.489,0.676,12.384-4.739,1.527-4.36-0.076-6.875-3.226-8.515,2.294-0.529,4.022-2.038,4.483-5.155zm-8.022,11.249c-1.085,4.36-8.426,2.003-10.806,1.412l1.928-7.729c2.38,0.594,10.012,1.77,8.878,6.317zm1.086-11.312c-0.99,3.966-7.1,1.951-9.082,1.457l1.748-7.01c1.982,0.494,8.365,1.416,7.334,5.553z"/>
+  </svg>
+</div>
+
 <div class="wrap">
-  <h1>₿ Bitcoin — Harga vs Nilai Intrinsik</h1>
-  <div class="sub" id="sub">memuat…</div>
+  <header>
+    <div class="brand">
+      <!-- Satoshi Scale mark: an original engraved-coin design, drawn in currentColor so it follows the theme -->
+      <svg class="logo" viewBox="0 0 100 100" role="img" aria-label="Satoshi Scale">
+        <defs><path id="ss-ring" d="M50,50 m0,-42.2 a42.2,42.2 0 1,1 0,84.4 a42.2,42.2 0 1,1 0,-84.4"/></defs>
+        <g fill="none" stroke="currentColor">
+          <circle cx="50" cy="50" r="48" stroke-width="2.4"/>
+          <circle cx="50" cy="50" r="36.5" stroke-width="1.1"/>
+          <circle cx="50" cy="50" r="33.2" stroke-width="1.1" stroke-dasharray="1.6 2.4"/>
+          <!-- circuit traces -->
+          <g stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" opacity=".75">
+            <path d="M22 44h8l4 -4h3"/><path d="M22 58h6l4 4h5"/>
+            <path d="M78 42h-7l-3 3h-3"/><path d="M78 57h-9l-3 -3h-2"/>
+          </g>
+        </g>
+        <g fill="currentColor" opacity=".8">
+          <circle cx="22" cy="44" r="1.6"/><circle cx="22" cy="58" r="1.6"/>
+          <circle cx="78" cy="42" r="1.6"/><circle cx="78" cy="57" r="1.6"/>
+        </g>
+        <text transform="rotate(-54 50 50)" font-family="Poppins,system-ui,sans-serif" font-size="6.1" font-weight="700" fill="currentColor" letter-spacing=".4">
+          <textPath href="#ss-ring" textLength="262" lengthAdjust="spacing">SATOSHI SCALE · PRICE VS INTRINSIC VALUE ·</textPath>
+        </text>
+        <path fill="currentColor" transform="translate(27.6 27.6) scale(.7)" d="m46.103,27.444c0.637-4.258-2.605-6.547-7.038-8.074l1.438-5.768-3.511-0.875-1.4,5.616c-0.923-0.23-1.871-0.447-2.813-0.662l1.41-5.653-3.509-0.875-1.439,5.766c-0.764-0.174-1.514-0.346-2.242-0.527l0.004-0.018-4.842-1.209-0.934,3.75s2.605,0.597,2.55,0.634c1.422,0.355,1.679,1.296,1.636,2.042l-1.638,6.571c0.098,0.025,0.225,0.061,0.365,0.117-0.117-0.029-0.242-0.061-0.371-0.092l-2.296,9.205c-0.174,0.432-0.615,1.08-1.609,0.834,0.035,0.051-2.552-0.637-2.552-0.637l-1.743,4.019,4.569,1.139c0.85,0.213,1.683,0.436,2.503,0.646l-1.453,5.834,3.507,0.875,1.439-5.772c0.958,0.26,1.888,0.5,2.798,0.726l-1.434,5.745,3.511,0.875,1.453-5.823c5.987,1.133,10.489,0.676,12.384-4.739,1.527-4.36-0.076-6.875-3.226-8.515,2.294-0.529,4.022-2.038,4.483-5.155zm-8.022,11.249c-1.085,4.36-8.426,2.003-10.806,1.412l1.928-7.729c2.38,0.594,10.012,1.77,8.878,6.317zm1.086-11.312c-0.99,3.966-7.1,1.951-9.082,1.457l1.748-7.01c1.982,0.494,8.365,1.416,7.334,5.553z"/>
+      </svg>
+      <div>
+        <h1>Satoshi Scale</h1>
+        <div class="tag" data-i18n="tagline">Price vs intrinsic value</div>
+      </div>
+    </div>
+    <div class="ctrl">
+      <div class="seg" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="id" aria-pressed="false">ID</button>
+      </div>
+      <button type="button" class="iconbtn" id="themeBtn" aria-label="Toggle theme">
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </header>
+  <p class="sub" id="sub"></p>
 
   <div class="cards">
-    <div class="card hero"><div class="lbl">Spot <span class="help" data-tip="Harga pasar BTC saat ini">?</span></div><div class="val" id="c-spot" style="color:var(--spot)">—</div></div>
-    <div class="card"><div class="lbl">Realized Price <span class="help" data-tip="Cost basis rata-rata jaringan — harga beli rata-rata semua BTC">?</span></div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
-    <div class="card"><div class="lbl">Floor Produksi <span class="help" data-tip="Perkiraan biaya listrik buat tambang 1 BTC — lantai hard downside">?</span></div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
-    <div class="card"><div class="lbl">MVRV <span class="help" data-tip="Market Cap / Realized Cap — rasio valuasi (>1 premium, <1 diskon)">?</span></div><div class="val" id="c-mvrv">—</div></div>
-    <div class="card"><div class="lbl">Avg Premium <span class="help" data-tip="Rata-rata premium dari semua (all-time), 2 tahun, 1 tahun, 90 hari terakhir">?</span></div><div class="val" id="c-avgprem" style="font-size:14px">—</div></div>
+    <div class="card hero"><div class="lbl">Spot <span class="help" data-tip-i18n="tipSpot">?</span></div><div class="val" id="c-spot" style="color:var(--spot-txt)">—</div></div>
+    <div class="card"><div class="lbl">Realized Price <span class="help" data-tip-i18n="tipReal">?</span></div><div class="val" id="c-real" style="color:var(--realized)">—</div></div>
+    <div class="card"><div class="lbl"><span data-i18n="floor">Production Floor</span> <span class="help" data-tip-i18n="tipFloor">?</span></div><div class="val" id="c-floor" style="color:var(--floor)">—</div></div>
+    <div class="card"><div class="lbl">MVRV <span class="help" data-tip-i18n="tipMvrv">?</span></div><div class="val" id="c-mvrv">—</div></div>
+    <div class="card"><div class="lbl">Avg Premium <span class="help" data-tip-i18n="tipAvg">?</span></div><div class="val" id="c-avgprem" style="font-size:14px">—</div></div>
     <div class="card verdict" style="flex:1;min-width:240px;display:flex;flex-direction:column;justify-content:center">
-      <div class="lbl" style="color:var(--mut);font-size:11px">SINYAL AKUMULASI</div>
+      <div class="lbl" style="font-size:11px" data-i18n="signal">Accumulation signal</div>
       <div id="verdict" style="margin-top:4px">—</div>
     </div>
   </div>
 
   <div class="toolbar" id="tfbar">
-    <span style="color:var(--mut);font-size:12px;margin-right:4px">Rentang:</span>
-    <button class="tf" data-d="90">3B</button>
-    <button class="tf" data-d="365">1T</button>
-    <button class="tf" data-d="730">2T</button>
+    <span style="color:var(--mut);font-size:12px;margin-right:4px" data-i18n="range">Range:</span>
+    <button class="tf" data-d="90" data-i18n="r3m">3M</button>
+    <button class="tf" data-d="365" data-i18n="r1y">1Y</button>
+    <button class="tf" data-d="730" data-i18n="r2y">2Y</button>
     <button class="tf active" data-d="0">ALL</button>
   </div>
 
   <div class="legend">
-    <span><i class="dot" style="background:var(--spot)"></i>Harga Spot <span class="help" data-tip="Harga pasar BTC realtime">?</span></span>
-    <span><i class="dot" style="background:var(--realized)"></i>Realized Price <span class="help" data-tip="Cost basis jaringan — harga beli rata-rata semua BTC di blockchain">?</span></span>
-    <span><i class="dot" style="background:var(--floor)"></i>Floor Produksi <span class="help" data-tip="Biaya listrik rata-rata tambang — lantai hard, bukan target harga">?</span></span>
+    <span><i class="dot" style="background:var(--spot)"></i><span data-i18n="spotPrice">Spot price</span> <span class="help" data-tip-i18n="tipSpotLive">?</span></span>
+    <span><i class="dot" style="background:var(--realized)"></i>Realized Price <span class="help" data-tip-i18n="tipRealLeg">?</span></span>
+    <span><i class="dot" style="background:var(--floor)"></i><span data-i18n="floor">Production Floor</span> <span class="help" data-tip-i18n="tipFloorLeg">?</span></span>
   </div>
-  <div id="hud">arahkan kursor ke grafik untuk melihat nilai per tanggal…</div>
+  <div id="hud"></div>
   <div id="chart"></div>
-  <div class="legend" style="margin-top:10px"><span><i class="dot" style="background:#b18cff"></i>MVRV — zona valuasi</span></div>
+  <div class="legend" style="margin-top:10px"><span><i class="dot" style="background:var(--mvrv)"></i><span data-i18n="mvrvZones">MVRV — valuation zones</span></span></div>
   <div id="mvrv"></div>
 
   <div class="foot" id="foot"></div>
@@ -108,25 +224,84 @@
 <script>
 const D = window.BTC_DATA;
 const S = D.series;
-const fmt = n => n==null ? '—' : '$'+Math.round(n).toLocaleString('en-US');
+const L = D.meta.latest;
 
-// ---- charts ----
-const common = {
-  layout:{background:{color:'transparent'},textColor:'#8a95ad'},
-  grid:{vertLines:{color:'#1f2940'},horzLines:{color:'#1f2940'}},
-  rightPriceScale:{borderColor:'#1f2940'},
-  timeScale:{borderColor:'#1f2940'},
-  crosshair:{mode:0},
+/* ---------------- i18n ---------------- */
+const I18N = {
+  en: {
+    tagline:'Price vs intrinsic value', floor:'Production Floor', signal:'Accumulation signal', range:'Range:',
+    r3m:'3M', r1y:'1Y', r2y:'2Y', spotPrice:'Spot price', mvrvZones:'MVRV — valuation zones',
+    tipSpot:'Current BTC market price', tipReal:'Network-wide average cost basis — the average price every BTC last moved at',
+    tipFloor:'Estimated electricity cost to mine 1 BTC — a hard downside floor', tipMvrv:'Market Cap / Realized Cap — valuation ratio (>1 premium, <1 discount)',
+    tipAvg:'Average premium over all history, 2 years, 1 year and the last 90 days', tipSpotLive:'BTC market price',
+    tipRealLeg:'Network cost basis — the average purchase price of all BTC on-chain', tipFloorLeg:'Average mining electricity cost — a hard floor, not a price target',
+    hudIdle:'hover the chart to see values for each date…', addr:'Active Addresses', all:'All',
+    sub:(n,a,b,src,gen)=>`${n} days · ${a} → ${b} · source: ${src} · updated ${gen}`, free:'free',
+    zones:[['DEEP VALUE','aggressive accumulation'],['ACCUMULATE','buying in stages is fine'],['FAIR / HOLD','hold, buy selectively'],['EXPENSIVE','ease off'],['EUPHORIA','distribute / avoid']],
+    mosPos:v=>`Margin of Safety +${v}%`, prem:v=>`Premium +${v}%`,
+    mosNowPos:v=>`Margin of Safety <b class="up">+${v}%</b> (below cost basis)`,
+    mosNowNeg:v=>`Premium <b class="warn">+${v}%</b> over cost basis — no margin of safety yet`,
+    saran:(mos,act,exp,up,deep)=>`${mos}. Action: <b>${act}</b>. The "EXPENSIVE" zone starts ~${exp} (+${up}% from here); a true margin of safety appears below ${deep} (MVRV<1).`,
+    foot:(p,dn)=>`⚠️ <b>An alert, not an enforcer</b> — the numbers are deterministic; the decision stays yours.<br>
+      <b>Concepts:</b> <b>Realized Price</b> = the average purchase price of all BTC (network cost basis). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
+      positive (+) = price BELOW cost basis (discount, Graham zone); negative (−) = price ABOVE cost basis (premium).
+      <b>Avg Premium</b> = mean premium per period (history vs now). <b>Production Floor</b> = average mining cost (eff ${p.eff_j_per_th} J/TH, $${p.price_per_kwh}/kWh) — a hard floor, not a price target.<br>
+      <b>Valuation zones (MVRV):</b> &lt;1 Deep Value | 1–1.5 Accumulate | 1.5–2.4 Fair/Hold | 2.4–3.2 Expensive | &gt;3.2 Euphoria.
+      Distance from here to the Production Floor: <b>${dn}%</b> downside. Stock-to-Flow and the Rainbow Chart are left out on purpose (no fundamental basis).<br>
+      <b>Updates:</b> data refreshes automatically every day at 08:15 WITA via GitHub Actions. Manual: run <code>python fetch_data.py</code>.`,
+    theme:'Toggle light/dark theme', lang:'Language',
+  },
+  id: {
+    tagline:'Harga vs nilai intrinsik', floor:'Floor Produksi', signal:'Sinyal akumulasi', range:'Rentang:',
+    r3m:'3B', r1y:'1T', r2y:'2T', spotPrice:'Harga Spot', mvrvZones:'MVRV — zona valuasi',
+    tipSpot:'Harga pasar BTC saat ini', tipReal:'Cost basis rata-rata jaringan — harga beli rata-rata semua BTC',
+    tipFloor:'Perkiraan biaya listrik buat tambang 1 BTC — lantai hard downside', tipMvrv:'Market Cap / Realized Cap — rasio valuasi (>1 premium, <1 diskon)',
+    tipAvg:'Rata-rata premium dari semua (all-time), 2 tahun, 1 tahun, 90 hari terakhir', tipSpotLive:'Harga pasar BTC realtime',
+    tipRealLeg:'Cost basis jaringan — harga beli rata-rata semua BTC di blockchain', tipFloorLeg:'Biaya listrik rata-rata tambang — lantai hard, bukan target harga',
+    hudIdle:'arahkan kursor ke grafik untuk melihat nilai per tanggal…', addr:'Alamat Aktif', all:'Semua',
+    sub:(n,a,b,src,gen)=>`${n} hari · ${a} → ${b} · sumber: ${src} · update ${gen}`, free:'gratis',
+    zones:[['DEEP VALUE','akumulasi agresif'],['AKUMULASI','beli bertahap OK'],['WAJAR / HOLD','tahan, beli selektif'],['MAHAL','kurangi agresivitas'],['EUFORIA','distribusi / hindari']],
+    mosPos:v=>`Margin of Safety +${v}%`, prem:v=>`Premium +${v}%`,
+    mosNowPos:v=>`Margin of Safety <b class="up">+${v}%</b> (di bawah cost basis)`,
+    mosNowNeg:v=>`Premium <b class="warn">+${v}%</b> di atas cost basis — belum ada margin of safety`,
+    saran:(mos,act,exp,up,deep)=>`${mos}. Aksi: <b>${act}</b>. Zona "MAHAL" mulai ~${exp} (+${up}% dari sekarang); MoS sejati muncul di bawah ${deep} (MVRV<1).`,
+    foot:(p,dn)=>`⚠️ <b>Alert, bukan enforcer</b> — angka deterministik, keputusan tetap di tangan kamu.<br>
+      <b>Konsep:</b> <b>Realized Price</b> = harga beli rata-rata semua BTC (cost basis jaringan). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
+      positif (+) = harga DI BAWAH cost basis (diskon, Graham zone); negatif (−) = harga DI ATAS cost basis (premium).
+      <b>Avg Premium</b> = rata-rata premium per periode (historis vs sekarang). <b>Floor Produksi</b> = biaya tambang rata-rata (eff ${p.eff_j_per_th} J/TH, $${p.price_per_kwh}/kWh) — lantai hard, bukan target harga.<br>
+      <b>Zona valuasi (MVRV):</b> &lt;1 Deep Value | 1–1.5 Akumulasi | 1.5–2.4 Wajar/Hold | 2.4–3.2 Mahal | &gt;3.2 Euforia.
+      Jarak sekarang ke Floor Produksi: <b>${dn}%</b> downside. S2F &amp; Rainbow Chart sengaja dihindari (tak punya dasar fundamental).<br>
+      <b>Update:</b> Data otomatis harian 08:15 WITA via GitHub Actions. Manual: jalankan <code>python fetch_data.py</code>.`,
+    theme:'Ganti tema terang/gelap', lang:'Bahasa',
+  },
 };
+let LANG = document.documentElement.lang === 'id' ? 'id' : 'en';
+const tr = k => I18N[LANG][k];
+const loc = () => LANG === 'id' ? 'id-ID' : 'en-US';
+const nf = (n, d=0) => n.toLocaleString(loc(), {minimumFractionDigits:d, maximumFractionDigits:d});
+const fmt = n => n==null ? '—' : '$'+nf(Math.round(n));
+const fdate = t => new Date(t+'T00:00:00Z').toLocaleDateString(loc(), {year:'numeric',month:'short',day:'numeric',timeZone:'UTC'});
+const cssv = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---------------- charts ---------------- */
+function chartLook(){
+  const line = cssv('--line');
+  return {
+    layout:{background:{color:'transparent'},textColor:cssv('--axis'),fontFamily:"'JetBrains Mono',ui-monospace,monospace"},
+    grid:{vertLines:{color:line},horzLines:{color:line}},
+    rightPriceScale:{borderColor:line}, timeScale:{borderColor:line},
+  };
+}
+const common = {...chartLook(), crosshair:{mode:0}};
 const chart = LightweightCharts.createChart(document.getElementById('chart'),
-  {...common, height:430, localization:{priceFormatter:fmt}});
+  {...common, height:430, localization:{locale:loc(), priceFormatter:fmt}});
 chart.priceScale('right').applyOptions({mode:1}); // log scale
 
-const spot = chart.addLineSeries({color:getCSS('--spot'),lineWidth:2,title:'Spot'});
-const real = chart.addLineSeries({color:getCSS('--realized'),lineWidth:2,title:'Realized'});
-const floor= chart.addLineSeries({color:getCSS('--floor'),lineWidth:2,title:'Floor'});
+const spot = chart.addLineSeries({color:cssv('--spot'),lineWidth:2,title:'Spot'});
+const real = chart.addLineSeries({color:cssv('--realized'),lineWidth:2,title:'Realized'});
+const floor= chart.addLineSeries({color:cssv('--floor'),lineWidth:2,title:'Floor'});
 
-// haluskan mining floor (MA 30 hari) — floor adalah tren biaya, bukan noise harian
+// smooth the mining floor (30-day MA): the floor is a cost trend, not daily noise
 function sma(arr,key,win){
   const out=[]; let sum=0, q=[];
   for(const r of arr){
@@ -140,59 +315,68 @@ spot.setData(S.map(r=>({time:r.t,value:r.price})));
 real.setData(S.map(r=>({time:r.t,value:r.realized})));
 floor.setData(sma(S,'floor',30));
 
-const mchart = LightweightCharts.createChart(document.getElementById('mvrv'),{...common,height:130});
-const mvrv = mchart.addLineSeries({color:'#b18cff',lineWidth:2});
+const mchart = LightweightCharts.createChart(document.getElementById('mvrv'),
+  {...common, height:130, localization:{locale:loc(), priceFormatter:v=>nf(v,2)}});
+const mvrv = mchart.addLineSeries({color:cssv('--mvrv'),lineWidth:2});
 mvrv.setData(S.map(r=>({time:r.t,value:r.mvrv})));
-// garis zona MVRV
-[[1,'#3ddc97','wajar'],[2.4,'#f7c948','premium'],[3.7,'#ff5c5c','euforia']].forEach(([v,c])=>{
+[[1,'#3ddc97'],[2.4,'#f7c948'],[3.7,'#ff5c5c']].forEach(([v,c])=>{
   mvrv.createPriceLine({price:v,color:c,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:String(v)});
 });
 
-// ---- HUD legend per tanggal (ala TradingView) ----
+function restyleCharts(){
+  const look = chartLook();
+  chart.applyOptions({...look, localization:{locale:loc(), priceFormatter:fmt}});
+  mchart.applyOptions({...look, localization:{locale:loc(), priceFormatter:v=>nf(v,2)}});
+  spot.applyOptions({color:cssv('--spot')});
+  real.applyOptions({color:cssv('--realized')});
+  floor.applyOptions({color:cssv('--floor')});
+  mvrv.applyOptions({color:cssv('--mvrv')});
+}
+
+/* ---------------- HUD per date (TradingView-style) ---------------- */
 const byDate = {}; S.forEach(r=>byDate[r.t]=r);
 const hud = document.getElementById('hud');
-// zona valuasi 5-tingkat (berbasis MVRV = Spot/Realized) + aksi
+const ZONE_COLORS = ['#3ddc97','#3ddc97','#4da3ff','#f7c948','#ff5c5c'];
+// zone name as TEXT follows the theme tokens (bright pill colours are unreadable on white)
+const ZONE_TEXT = ['--up','--up','--realized','--warn','--down'];
+// five-step valuation zone from MVRV (= Spot/Realized) + suggested action
 function zoneMVRV(m){
-  if(m<1.0) return ['DEEP VALUE','#3ddc97','akumulasi agresif'];
-  if(m<1.5) return ['AKUMULASI','#3ddc97','beli bertahap OK'];
-  if(m<2.4) return ['WAJAR / HOLD','#4da3ff','tahan, beli selektif'];
-  if(m<3.2) return ['MAHAL','#f7c948','kurangi agresivitas'];
-  return ['EUFORIA','#ff5c5c','distribusi / hindari'];
+  const i = m<1.0 ? 0 : m<1.5 ? 1 : m<2.4 ? 2 : m<3.2 ? 3 : 4;
+  const [name, act] = tr('zones')[i];
+  return [name, ZONE_COLORS[i], act, `var(${ZONE_TEXT[i]})`];
 }
 function pct(a,b){ // a vs b, +/-
   const v=(a/b-1)*100, s=v>=0?'+':'';
-  const cls=v>=0?'up':'down';
-  return `<span class="${cls}">${s}${v.toFixed(1)}%</span>`;
+  return `<span class="${v>=0?'up':'down'}">${s}${nf(v,1)}%</span>`;
 }
-// satu field adaptif: MoS positif (diskon) atau Premium (di atas cost basis)
+// one adaptive field: Margin of Safety (discount) or Premium (above cost basis)
 function mosField(r){
   const mos=(r.realized-r.price)/r.realized*100;
-  if(mos>=0)
-    return `<span class="up">Margin of Safety +${mos.toFixed(1)}%</span>`;
-  return `<span style="color:#f7c948;font-weight:700">Premium +${(-mos).toFixed(1)}%</span>`
-       + ` <span class="h-sub">(MoS −${(-mos).toFixed(1)}%)</span>`;
+  if(mos>=0) return `<span class="up">${tr('mosPos')(nf(mos,1))}</span>`;
+  return `<span class="warn">${tr('prem')(nf(-mos,1))}</span> <span class="h-sub">(MoS −${nf(-mos,1)}%)</span>`;
 }
+let hudRow = null;
 function updateHUD(r){
-  if(!r){ hud.innerHTML='arahkan kursor ke grafik untuk melihat nilai per tanggal…'; return; }
-  const [z,zc,act]=zoneMVRV(r.mvrv);
+  hudRow = r;
+  if(!r){ hud.textContent = tr('hudIdle'); return; }
+  const [z,,act,zc]=zoneMVRV(r.mvrv);
   const floorTxt = r.floor ? `<b>${fmt(r.floor)}</b> <span class="down">${pct(r.floor,r.price)}</span>` : '<b>—</b>';
   hud.innerHTML =
-    `<span class="h-date">${r.t}</span>`+
+    `<span class="h-date">${fdate(r.t)}</span>`+
     `<span class="h-item"><i class="h-dot" style="background:var(--spot)"></i>Spot <b>${fmt(r.price)}</b></span>`+
     `<span class="h-item"><i class="h-dot" style="background:var(--realized)"></i>Realized <b>${fmt(r.realized)}</b> · ${mosField(r)}</span>`+
-    `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>Floor Produksi ${floorTxt}</span>`+
-    `<span class="h-item"><i class="h-dot" style="background:#b18cff"></i>MVRV <b>${r.mvrv.toFixed(2)}</b> <span style="color:${zc};font-weight:700">${z}</span> <span class="h-sub">· ${act}</span></span>`+
-    (r.addr?`<span class="h-item">Active Addresses <b>${Math.round(r.addr).toLocaleString('en-US')}</b></span>`:'');
+    `<span class="h-item"><i class="h-dot" style="background:var(--floor)"></i>${tr('floor')} ${floorTxt}</span>`+
+    `<span class="h-item"><i class="h-dot" style="background:var(--mvrv)"></i>MVRV <b>${nf(r.mvrv,2)}</b> <span style="color:${zc};font-weight:700">${z}</span> <span class="h-sub">· ${act}</span></span>`+
+    (r.addr?`<span class="h-item">${tr('addr')} <b>${nf(Math.round(r.addr))}</b></span>`:'');
 }
 function hudFromParam(p){
   if(p && p.time){ updateHUD(byDate[p.time]); }
-  else { updateHUD(D.meta.latest); } // keluar grafik -> tampilkan terkini
+  else { updateHUD(L); } // pointer left the chart -> show the latest day
 }
 chart.subscribeCrosshairMove(hudFromParam);
 mchart.subscribeCrosshairMove(hudFromParam);
-updateHUD(D.meta.latest); // nilai awal = terkini
 
-// sinkron sumbu waktu (dengan guard agar tidak saling memanggil tanpa henti)
+// sync the two time axes (guarded so they don't call each other forever)
 let syncing=false;
 chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{
   if(syncing||!r)return; syncing=true;
@@ -203,7 +387,7 @@ mchart.timeScale().subscribeVisibleLogicalRangeChange(r=>{
   chart.timeScale().setVisibleLogicalRange(r); syncing=false;
 });
 
-// ---- rentang waktu ----
+/* ---------------- time range ---------------- */
 function setRange(days){
   if(days===0){ chart.timeScale().fitContent(); return; }
   const to = S[S.length-1].t;
@@ -216,60 +400,89 @@ document.querySelectorAll('.tf').forEach(b=>b.onclick=()=>{
 });
 chart.timeScale().fitContent();
 
-// ---- kartu + verdict ----
-const L = D.meta.latest;
-document.getElementById('c-spot').textContent  = fmt(L.price);
-document.getElementById('c-real').textContent  = fmt(L.realized);
-document.getElementById('c-floor').textContent = fmt(L.floor);
-document.getElementById('c-mvrv').textContent  = L.mvrv.toFixed(2);
-document.getElementById('sub').textContent =
-  `${D.meta.n} hari · ${D.meta.range[0]} → ${D.meta.range[1]} · sumber: ${D.meta.source} · update ${D.meta.generated}`;
-
-// ---- hitung average premium (semua periode) ----
+/* ---------------- average premium (all periods) ---------------- */
 function avgPremium(days) {
   const cutoff = days===0 ? S[0].t : S[S.length-1-Math.min(S.length-1,days)].t;
   const filtered = S.filter(r => r.t >= cutoff);
   const prems = filtered.map(r => (r.price/r.realized-1)*100);
   return prems.length > 0 ? prems.reduce((a,b)=>a+b)/prems.length : 0;
 }
-const avgAll = avgPremium(0);      // semua
-const avg2Y = avgPremium(730);     // 2 tahun
-const avg1Y = avgPremium(365);     // 1 tahun
-const avg90D = avgPremium(90);     // 90 hari
-const avgTxt = `All: ${avgAll.toFixed(1)}% · 2Y: ${avg2Y.toFixed(1)}% · 1Y: ${avg1Y.toFixed(1)}% · 90D: ${avg90D.toFixed(1)}%`;
-document.getElementById('c-avgprem').textContent = avgTxt;
+const AVG = {all:avgPremium(0), y2:avgPremium(730), y1:avgPremium(365), d90:avgPremium(90)};
 
-const m=L.mvrv;
-const [zona,warna,act]=zoneMVRV(m);
-const mosNow=(L.realized-L.price)/L.realized*100;
-const mosTxt = mosNow>=0
-  ? `Margin of Safety <b style="color:#3ddc97">+${mosNow.toFixed(1)}%</b> (di bawah cost basis)`
-  : `Premium <b style="color:#f7c948">+${(-mosNow).toFixed(1)}%</b> di atas cost basis — belum ada margin of safety`;
-// jarak ke zona MAHAL (MVRV 2.4) dan ke DEEP VALUE (MVRV 1.0)
-const priceExpensive = 2.4*L.realized;            // ambang MAHAL
-const priceDeepValue = 1.0*L.realized;            // ambang DEEP VALUE
-const roomUp  = ((priceExpensive/L.price-1)*100).toFixed(0);
-const saran = `${mosTxt}. Aksi: <b>${act}</b>. `+
-  `Zona "MAHAL" mulai ~${fmt(priceExpensive)} (+${roomUp}% dari sekarang); `+
-  `MoS sejati muncul di bawah ${fmt(priceDeepValue)} (MVRV<1).`;
-document.getElementById('verdict').innerHTML =
-  `<span class="pill" style="background:${warna};color:#0b0f19">${zona}</span>
-   <span style="color:var(--mut);font-size:12px;display:block;margin-top:6px">${saran}</span>`;
+/* ---------------- cards, verdict, footer: rendered per language ---------------- */
+function renderText(){
+  document.getElementById('c-spot').textContent  = fmt(L.price);
+  document.getElementById('c-real').textContent  = fmt(L.realized);
+  document.getElementById('c-floor').textContent = fmt(L.floor);
+  document.getElementById('c-mvrv').textContent  = nf(L.mvrv,2);
+  const src = D.meta.source.replace('(gratis)', '('+tr('free')+')');
+  document.getElementById('sub').textContent =
+    tr('sub')(nf(D.meta.n), fdate(D.meta.range[0]), fdate(D.meta.range[1]), src, D.meta.generated);
+  document.getElementById('c-avgprem').textContent =
+    `${tr('all')}: ${nf(AVG.all,1)}% · 2Y: ${nf(AVG.y2,1)}% · 1Y: ${nf(AVG.y1,1)}% · 90D: ${nf(AVG.d90,1)}%`;
 
-const downside = ((L.floor/L.price-1)*100).toFixed(0);
-document.getElementById('foot').innerHTML =
-  `⚠️ <b>Alert, bukan enforcer</b> — angka deterministik, keputusan tetap di tangan kamu.<br>
-   <b>Konsep:</b> <b>Realized Price</b> = harga beli rata-rata semua BTC (cost basis jaringan). <b>Margin of Safety</b> = (Realized−Spot)/Realized:
-   positif (+) = harga DI BAWAH cost basis (diskon, Graham zone); negatif (−) = harga DI ATAS cost basis (premium).
-   <b>Avg Premium</b> = rata-rata premium per periode (historis vs sekarang). <b>Floor Produksi</b> = biaya tambang rata-rata (eff ${D.meta.params.eff_j_per_th} J/TH, $${D.meta.params.price_per_kwh}/kWh) — lantai hard, bukan target harga.<br>
-   <b>Zona valuasi (MVRV):</b> <1 Deep Value | 1–1.5 Akumulasi | 1.5–2.4 Wajar/Hold | 2.4–3.2 Mahal | >3.2 Euforia.
-   Jarak sekarang ke Floor Produksi: <b>${downside}%</b> downside. S2F & Rainbow Chart sengaja dihindari (tak punya dasar fundamental).<br>
-   <b>Update:</b> Data otomatis harian 08:15 WITA via GitHub Actions. Manual: jalankan <code>python fetch_data.py</code>.`;
+  const [zona,warna,act]=zoneMVRV(L.mvrv);
+  const mosNow=(L.realized-L.price)/L.realized*100;
+  const mosTxt = mosNow>=0 ? tr('mosNowPos')(nf(mosNow,1)) : tr('mosNowNeg')(nf(-mosNow,1));
+  // distance to the EXPENSIVE zone (MVRV 2.4) and to DEEP VALUE (MVRV 1.0)
+  const priceExpensive = 2.4*L.realized;
+  const priceDeepValue = 1.0*L.realized;
+  const roomUp = nf(Math.round((priceExpensive/L.price-1)*100));
+  document.getElementById('verdict').innerHTML =
+    `<span class="pill" style="background:${warna}">${zona}</span>
+     <span style="color:var(--mut);font-size:12px;display:block;margin-top:6px;font-weight:500">${tr('saran')(mosTxt,act,fmt(priceExpensive),roomUp,fmt(priceDeepValue))}</span>`;
 
-// ikon help bisa di-tap/fokus (mobile & keyboard)
+  const downside = nf(Math.round((L.floor/L.price-1)*100));
+  document.getElementById('foot').innerHTML = tr('foot')(D.meta.params, downside);
+  updateHUD(hudRow || L);
+}
+
+/* ---------------- language ---------------- */
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(e=>{ e.textContent = tr(e.dataset.i18n); });
+  document.querySelectorAll('[data-tip-i18n]').forEach(e=>{ e.setAttribute('data-tip', tr(e.dataset.tipI18n)); e.setAttribute('aria-label', tr(e.dataset.tipI18n)); });
+  document.querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.lang===LANG)));
+  document.querySelector('.seg').setAttribute('aria-label', tr('lang'));
+  document.getElementById('themeBtn').setAttribute('aria-label', tr('theme'));
+  restyleCharts();
+  renderText();
+}
+document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{
+  LANG = b.dataset.lang;
+  try{localStorage.setItem('ss-lang', LANG);}catch(e){}
+  applyLang();
+});
+
+/* ---------------- theme ---------------- */
+document.getElementById('themeBtn').onclick=()=>{
+  const next = document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', cssv('--bg'));
+  try{localStorage.setItem('ss-theme', next);}catch(e){}
+  restyleCharts();
+};
+document.querySelector('meta[name="theme-color"]').setAttribute('content', cssv('--bg'));
+
+applyLang();
+
+// help icons are tappable/focusable (mobile + keyboard)
 document.querySelectorAll('.help').forEach(e=>{e.setAttribute('tabindex','0');e.setAttribute('role','button');});
 
-function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+/* ---------------- loader: charts are drawn by now; release after the logo lands ---------------- */
+(function(){
+  const el = document.getElementById('loader');
+  if(!document.documentElement.classList.contains('boot')) return;
+  // Wait for the logo's own animations, not a clock from navigation start: on a
+  // slow connection the page can be 4-5 s into loading before this runs, and a
+  // navigation-based timer would dismiss the loader before the logo had drawn.
+  const anims = [...el.querySelectorAll('.ring,.b')].flatMap(n => n.getAnimations ? n.getAnimations() : []);
+  Promise.all(anims.map(a => a.finished.catch(()=>{}))).then(()=>{
+    el.classList.add('done');
+    // the logo's own animations bubble here too; only the overlay fade ends the loader
+    el.addEventListener('animationend', e=>{ if(e.target===el) document.documentElement.classList.remove('boot'); });
+  });
+})();
 </script>
 </body>
 </html>
