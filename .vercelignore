@@ -1,0 +1,14 @@
+# Whitelist: publish only what the page loads at runtime
+*
+!index.html
+!data.js
+!favicon.svg
+!assets
+!assets/lightweight-charts-4.1.3.js
+# belt and braces
+.git
+.github
+.claude
+.vercel
+fetch_data.py
+README.md

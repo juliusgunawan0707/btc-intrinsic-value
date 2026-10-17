@@ -10,7 +10,7 @@ A dashboard that tracks **Bitcoin's spot price** against two proxies for fundame
 
 Zoomable ranges (3M / 1Y / 2Y / all), a TradingView-style crosshair readout, dark/light theme and English/Bahasa Indonesia (defaults: dark + English, choices remembered per browser).
 
-**[🔗 Open the dashboard](https://juliusgunawan0707.github.io/btc-intrinsic-value/)**
+**[🔗 Open the dashboard](https://satoshi-scale.vercel.app/)**
 
 > The repository is still named `btc-intrinsic-value` so existing links keep working; only the title changed.
 

@@ -8,9 +8,17 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      # IDs are identifiers, not secrets. The only secret is VERCEL_TOKEN.
+      VERCEL_ORG_ID: team_0IJ3590Xmtg2BMq1vfMYtRHP
+      VERCEL_PROJECT_ID: prj_fXoDQdp0VSH5Bmo1eYM52Sjfb8hi
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,3 +43,19 @@ jobs:
             git commit -m "chore: update BTC data ($(date -u +'%Y-%m-%d %H:%M UTC'))"
             git push origin main
           fi
+
+      # Publish to Vercel every run (not only when data changed), so a failed
+      # deploy yesterday heals today. Only the 4 runtime files are uploaded.
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::Secret VERCEL_TOKEN is not set (repo Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+          rm -rf site && mkdir -p site/assets
+          cp index.html data.js favicon.svg site/
+          cp assets/lightweight-charts-4.1.3.js site/assets/
+          cd site
+          npx --yes vercel@64.5.0 deploy --prod --yes
